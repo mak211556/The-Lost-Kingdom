@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>The Lost Kingdom</title>
+
+<style>
+
+body{
+margin:0;
+overflow:hidden;
+background:#111;
+}
+
+canvas{
+display:block;
+background:linear-gradient(
+to bottom,
+#1a1a1a,
+#2a2a2a
+);
+}
+
+</style>
+
+</head>
+
+<body>
+
+<canvas id="game"></canvas>
+
+<script>
+
+const canvas =
+document.getElementById("game");
+
+const ctx =
+canvas.getContext("2d");
+
+canvas.width =
+window.innerWidth;
+
+canvas.height =
+window.innerHeight;
+
+
+
+const player = {
+
+x:100,
+y:400,
+
+width:50,
+height:70,
+
+speed:6,
+
+velocityY:0,
+
+jumpPower:-16,
+
+gravity:0.8,
+
+grounded:false
+
+};
+
+
+
+const keys = {};
+
+
+
+document.addEventListener(
+"keydown",
+e => keys[e.key] = true
+);
+
+document.addEventListener(
+"keyup",
+e => keys[e.key] = false
+);
+
+
+
+
+function update(){
+
+
+if(keys["a"] || keys["ArrowLeft"]){
+
+player.x -= player.speed;
+
+}
+
+
+if(keys["d"] || keys["ArrowRight"]){
+
+player.x += player.speed;
+
+}
+
+
+
+if(
+(keys["w"] || keys[" "]
+|| keys["ArrowUp"])
+&& player.grounded
+){
+
+player.velocityY =
+player.jumpPower;
+
+player.grounded = false;
+
+}
+
+
+
+player.velocityY +=
+player.gravity;
+
+player.y +=
+player.velocityY;
+
+
+
+const ground =
+canvas.height - 120;
+
+
+
+if(player.y + player.height >= ground){
+
+player.y =
+ground - player.height;
+
+player.velocityY = 0;
+
+player.grounded = true;
+
+}
+
+
+
+}
+
+
+
+function draw(){
+
+
+ctx.clearRect(
+0,
+0,
+canvas.width,
+canvas.height
+);
+
+
+
+ctx.fillStyle =
+"#6e6254";
+
+ctx.fillRect(
+0,
+canvas.height - 120,
+canvas.width,
+120
+);
+
+
+
+ctx.fillStyle =
+"#d4af37";
+
+ctx.fillRect(
+player.x,
+player.y,
+player.width,
+player.height
+);
+
+
+
+}
+
+
+
+function gameLoop(){
+
+update();
+
+draw();
+
+requestAnimationFrame(
+gameLoop
+);
+
+}
+
+
+
+gameLoop();
+
+</script>
+
+</body>
+
+</html>
