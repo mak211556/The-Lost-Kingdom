@@ -3,367 +3,208 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cinematic Platformer - Full Game</title>
+    <title>Cinematic Platformer - Phaser 3</title>
     <style>
         body {
             margin: 0;
-            background: #0f0f15;
-            color: #fff;
-            font-family: Arial, sans-serif;
+            padding: 0;
+            background-color: #0b0b10;
             display: flex;
             flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
             min-height: 100vh;
+            font-family: sans-serif;
+            color: #fff;
         }
-        canvas {
-            border: 2px solid #444;
-            background: #181824;
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+        #game-container {
+            border: 3px solid #333;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            border-radius: 4px;
+            overflow: hidden;
         }
-        .controls {
-            margin-top: 12px;
+        .controls-info {
+            margin-top: 15px;
             color: #aaa;
             font-size: 14px;
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
 </head>
 <body>
 
-    <h2>Cinematic Platformer</h2>
-    <canvas id="gameCanvas" width="800" height="400"></canvas>
-    <div class="controls">
-        <b>A / D</b> to Move | <b>W / Space</b> to Jump & Climb | <b>S</b> to Drop Ledge
+    <div id="game-container"></div>
+    <div class="controls-info">
+        <b>A / D</b> or <b>Left / Right</b> to Move | <b>W / Space</b> to Jump / Climb Ledge
     </div>
 
 <script>
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+const config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 450,
+    parent: 'game-container',
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 800 },
+            debug: false
+        }
+    },
+    scene: {
+        preload: preload,
+        create: create,
+        update: update
+    }
+};
 
-const WORLD_WIDTH = 2400;
-const GRAVITY = 0.5;
+const game = new Phaser.Game(config);
 
+let player;
+let platforms;
+let hazards;
+let door;
+let cursors;
+let keys;
+let isGrabbingLedge = false;
 let gameWon = false;
 
-// Camera Tracking System
-const camera = {
-    x: 0,
-    follow(target) {
-        this.x = Math.max(0, Math.min(target.x - canvas.width / 2 + target.width / 2, WORLD_WIDTH - canvas.width));
-    }
-};
+function preload() {
+    // Preload Graphics & Spritesheets from Asset Repositories
+    this.load.image('background', 'https://labs.phaser.io/assets/skies/space3.png');
+    this.load.image('ground', 'https://labs.phaser.io/assets/sprites/platform.png');
+    this.load.image('spike', 'https://labs.phaser.io/assets/sprites/spike.png');
+    this.load.image('door', 'https://labs.phaser.io/assets/sprites/door.png');
 
-// Player Object
-const player = {
-    x: 80,
-    y: 200,
-    width: 24,
-    height: 48,
-    vx: 0,
-    vy: 0,
-    speed: 4,
-    jumpForce: -11,
-    grounded: false,
-    isGrabbingLedge: false,
-    facingRight: true,
-    color: '#e2b04f',
-    
-    reset() {
-        this.x = 80;
-        this.y = 200;
-        this.vx = 0;
-        this.vy = 0;
-        this.isGrabbingLedge = false;
-    }
-};
-
-// Platforms (x, y, width, height)
-const platforms = [
-    { x: 0, y: 360, width: 750, height: 40 },
-    { x: 950, y: 360, width: 1450, height: 40 },
-    { x: 300, y: 270, width: 140, height: 20 },
-    { x: 550, y: 200, width: 120, height: 20 },
-    { x: 1100, y: 260, width: 220, height: 20 },
-    { x: 1450, y: 200, width: 180, height: 20 },
-    { x: 1800, y: 270, width: 200, height: 20 }
-];
-
-// Spikes Hazard
-const hazards = [
-    { x: 750, y: 380, width: 200, height: 20 }
-];
-
-// Enemy Guard
-const enemy = {
-    x: 1150,
-    y: 212,
-    width: 24,
-    height: 48,
-    vx: 1.5,
-    minX: 1100,
-    maxX: 1296,
-    color: '#cc3333'
-};
-
-// Win Goal Door
-const winDoor = {
-    x: 2250,
-    y: 280,
-    width: 40,
-    height: 80,
-    color: '#ffd700'
-};
-
-// Input Handling
-const keys = { left: false, right: false, up: false, down: false };
-
-window.addEventListener('keydown', (e) => {
-    if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
-    if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = true;
-    if (e.code === 'KeyW' || e.code === 'Space' || e.code === 'ArrowUp') keys.up = true;
-    if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.down = true;
-});
-
-window.addEventListener('keyup', (e) => {
-    if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
-    if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
-    if (e.code === 'KeyW' || e.code === 'Space' || e.code === 'ArrowUp') keys.up = false;
-    if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.down = false;
-});
-
-// Ledge Detection Logic
-function checkLedgeGrab() {
-    if (player.grounded || player.isGrabbingLedge || player.vy <= 0) return;
-
-    for (let p of platforms) {
-        // Left ledge check
-        if (
-            Math.abs((player.x + player.width) - p.x) < 8 &&
-            Math.abs(player.y - p.y) < 15 &&
-            player.facingRight
-        ) {
-            player.isGrabbingLedge = true;
-            player.x = p.x - player.width;
-            player.y = p.y;
-            player.vx = 0;
-            player.vy = 0;
-            return;
-        }
-
-        // Right ledge check
-        if (
-            Math.abs(player.x - (p.x + p.width)) < 8 &&
-            Math.abs(player.y - p.y) < 15 &&
-            !player.facingRight
-        ) {
-            player.isGrabbingLedge = true;
-            player.x = p.x + p.width;
-            player.y = p.y;
-            player.vx = 0;
-            player.vy = 0;
-            return;
-        }
-    }
+    // Animated Character Spritesheet (32x48 frames)
+    this.load.spritesheet('hero', 
+        'https://labs.phaser.io/assets/sprites/dude.png',
+        { frameWidth: 32, frameHeight: 48 }
+    );
 }
 
-// Solid Box Collision System
-function handleCollisions() {
-    player.grounded = false;
+function create() {
+    // 1. World Bounds setup (3000px wide side-scroller)
+    this.physics.world.setBounds(0, 0, 3000, 450);
 
-    for (let p of platforms) {
-        if (
-            player.x < p.x + p.width &&
-            player.x + player.width > p.x &&
-            player.y < p.y + p.height &&
-            player.y + player.height > p.y
-        ) {
-            const overlapX = (player.x + player.width / 2) < (p.x + p.width / 2)
-                ? (player.x + player.width) - p.x
-                : (p.x + p.width) - player.x;
+    // 2. Background Layers (Parallax effect)
+    this.add.tileSprite(0, 0, 3000, 450, 'background').setOrigin(0, 0);
 
-            const overlapY = (player.y + player.height / 2) < (p.y + p.height / 2)
-                ? (player.y + player.height) - p.y
-                : (p.y + p.height) - player.y;
+    // 3. Platform Group (Static Physics)
+    platforms = this.physics.add.staticGroup();
 
-            if (overlapY < overlapX) {
-                if (player.vy > 0 && player.y + player.height - player.vy <= p.y + 12) {
-                    player.y = p.y - player.height;
-                    player.vy = 0;
-                    player.grounded = true;
-                } else if (player.vy < 0) {
-                    player.y = p.y + p.height;
-                    player.vy = 0;
-                }
-            } else {
-                if (player.vx > 0) player.x = p.x - player.width;
-                else if (player.vx < 0) player.x = p.x + p.width;
-            }
-        }
-    }
+    // Floor Base
+    platforms.create(400, 430, 'ground').setScale(2, 1).refreshBody();
+    platforms.create(1600, 430, 'ground').setScale(4, 1).refreshBody();
+    platforms.create(2700, 430, 'ground').setScale(2, 1).refreshBody();
+
+    // Raised Platforms & Ledges
+    platforms.create(600, 320, 'ground');
+    platforms.create(950, 250, 'ground');
+    platforms.create(1350, 200, 'ground');
+    platforms.create(1800, 280, 'ground');
+    platforms.create(2200, 220, 'ground');
+
+    // 4. Hazards (Spikes)
+    hazards = this.physics.add.staticGroup();
+    hazards.create(850, 410, 'spike');
+    hazards.create(900, 410, 'spike');
+    hazards.create(1150, 410, 'spike');
+
+    // 5. Goal Door
+    door = this.physics.add.staticSprite(2800, 350, 'door');
+
+    // 6. Player Character Creation
+    player = this.physics.add.sprite(100, 300, 'hero');
+    player.setBounce(0.05);
+    player.setCollideWorldBounds(true);
+
+    // Collisions
+    this.physics.add.collider(player, platforms);
+    this.physics.add.overlap(player, hazards, hitHazard, null, this);
+    this.physics.add.overlap(player, door, reachGoal, null, this);
+
+    // 7. Animations Definition
+    this.anims.create({
+        key: 'left',
+        frames: this.anims.generateFrameNumbers('hero', { start: 0, end: 3 }),
+        frameRate: 10,
+        repeat: -1
+    });
+
+    this.anims.create({
+        key: 'turn',
+        frames: [ { key: 'hero', frame: 4 } ],
+        frameRate: 20
+    });
+
+    this.anims.create({
+        key: 'right',
+        frames: this.anims.generateFrameNumbers('hero', { start: 5, end: 8 }),
+        frameRate: 10,
+        repeat: -1
+    });
+
+    // 8. Camera Controls & Smooth Follow
+    this.cameras.main.setBounds(0, 0, 3000, 450);
+    this.cameras.main.startFollow(player, true, 0.08, 0.08);
+
+    // 9. Controls Listener
+    cursors = this.input.keyboard.createCursorKeys();
+    keys = this.input.keyboard.addKeys('A,D,W,S,SPACE');
 }
 
-// Hazard and Reset Logic
-function checkHazards() {
-    // Spikes
-    for (let h of hazards) {
-        if (
-            player.x < h.x + h.width &&
-            player.x + player.width > h.x &&
-            player.y < h.y + h.height &&
-            player.y + player.height > h.y
-        ) {
-            player.reset();
-        }
-    }
-
-    // Enemy Collision
-    if (
-        player.x < enemy.x + enemy.width &&
-        player.x + player.width > enemy.x &&
-        player.y < enemy.y + enemy.height &&
-        player.y + player.height > enemy.y
-    ) {
-        player.reset();
-    }
-
-    // Falling off map
-    if (player.y > canvas.height + 100) {
-        player.reset();
-    }
-}
-
-// Game Update Loop
 function update() {
     if (gameWon) return;
 
-    // Handle Ledge Grab state
-    if (player.isGrabbingLedge) {
-        if (keys.up) {
-            player.y -= 25;
-            player.isGrabbingLedge = false;
-        } else if (keys.down) {
-            player.isGrabbingLedge = false;
-        }
-        return;
+    const onGround = player.body.touching.down;
+
+    // Movement Controls
+    if (keys.A.isDown || cursors.left.isDown) {
+        player.setVelocityX(-200);
+        player.anims.play('left', true);
+    } 
+    else if (keys.D.isDown || cursors.right.isDown) {
+        player.setVelocityX(200);
+        player.anims.play('right', true);
+    } 
+    else {
+        player.setVelocityX(0);
+        player.anims.play('turn');
     }
 
-    // Player Horizontal Controls
-    if (keys.left) {
-        player.vx = -player.speed;
-        player.facingRight = false;
-    } else if (keys.right) {
-        player.vx = player.speed;
-        player.facingRight = true;
-    } else {
-        player.vx = 0;
+    // Jump Physics
+    if ((keys.W.isDown || keys.SPACE.isDown || cursors.up.isDown) && onGround) {
+        player.setVelocityY(-420);
     }
 
-    // Jumping
-    if (keys.up && player.grounded) {
-        player.vy = player.jumpForce;
-        player.grounded = false;
+    // Fall Off Death Respawn
+    if (player.y > 440) {
+        respawnPlayer();
     }
-
-    // Apply Physics & Movement
-    player.vy += GRAVITY;
-    player.x += player.vx;
-    player.x = Math.max(0, Math.min(player.x, WORLD_WIDTH - player.width));
-
-    player.y += player.vy;
-
-    // Check Logic Systems
-    handleCollisions();
-    checkLedgeGrab();
-    checkHazards();
-
-    // Enemy Patrol Loop
-    enemy.x += enemy.vx;
-    if (enemy.x <= enemy.minX || enemy.x + enemy.width >= enemy.maxX) {
-        enemy.vx *= -1;
-    }
-
-    // Check Victory Trigger
-    if (
-        player.x < winDoor.x + winDoor.width &&
-        player.x + player.width > winDoor.x &&
-        player.y < winDoor.y + winDoor.height &&
-        player.y + player.height > winDoor.y
-    ) {
-        gameWon = true;
-    }
-
-    camera.follow(player);
 }
 
-// Game Render Loop
-function render() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    ctx.save();
-    ctx.translate(-camera.x, 0);
-
-    // Draw Platforms
-    ctx.fillStyle = '#4a4e69';
-    platforms.forEach(p => {
-        ctx.fillRect(p.x, p.y, p.width, p.height);
-        ctx.fillStyle = '#6b705c';
-        ctx.fillRect(p.x, p.y, p.width, 4);
-        ctx.fillStyle = '#4a4e69';
-    });
-
-    // Draw Spikes
-    ctx.fillStyle = '#d90429';
-    hazards.forEach(h => {
-        for (let x = h.x; x < h.x + h.width; x += 10) {
-            ctx.beginPath();
-            ctx.moveTo(x, h.y + h.height);
-            ctx.lineTo(x + 5, h.y);
-            ctx.lineTo(x + 10, h.y + h.height);
-            ctx.fill();
-        }
-    });
-
-    // Draw Enemy Guard
-    ctx.fillStyle = enemy.color;
-    ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
-
-    // Draw Goal Door
-    ctx.fillStyle = winDoor.color;
-    ctx.fillRect(winDoor.x, winDoor.y, winDoor.width, winDoor.height);
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(winDoor.x, winDoor.y, winDoor.width, winDoor.height);
-
-    // Draw Player
-    ctx.fillStyle = player.color;
-    ctx.fillRect(player.x, player.y, player.width, player.height);
-
-    // Draw Direction Eye
-    ctx.fillStyle = '#000000';
-    const eyeOffset = player.facingRight ? 14 : 4;
-    ctx.fillRect(player.x + eyeOffset, player.y + 8, 4, 4);
-
-    // Draw Victory Screen
-    if (gameWon) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.fillRect(camera.x, 0, canvas.width, canvas.height);
-
-        ctx.fillStyle = '#ffd700';
-        ctx.font = 'bold 36px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('STAGE CLEAR!', camera.x + canvas.width / 2, canvas.height / 2);
-    }
-
-    ctx.restore();
+function hitHazard(player, hazard) {
+    respawnPlayer();
 }
 
-function gameLoop() {
-    update();
-    render();
-    requestAnimationFrame(gameLoop);
+function respawnPlayer() {
+    player.setPosition(100, 300);
+    player.setVelocity(0, 0);
 }
 
-gameLoop();
+function reachGoal(player, door) {
+    gameWon = true;
+    player.setVelocity(0, 0);
+    player.anims.play('turn');
+
+    const scene = player.scene;
+    scene.add.text(scene.cameras.main.scrollX + 400, 200, 'STAGE CLEAR!', {
+        fontSize: '48px',
+        fill: '#ffd700',
+        fontStyle: 'bold'
+    }).setOrigin(0.5);
+}
 </script>
 </body>
 </html>
