@@ -1,173 +1,369 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>The Lost Kingdom</title>
-
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&display=swap" rel="stylesheet">
-
-<style>
-
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-}
-
-body{
-    background:#111111;
-    overflow:hidden;
-    font-family:'Cinzel', serif;
-    color:white;
-}
-
-/* Background */
-
-.background{
-    position:fixed;
-    inset:0;
-    background:
-    radial-gradient(circle at center,
-    rgba(212,175,55,0.15),
-    transparent 60%);
-}
-
-/* Castle silhouette */
-
-.castle{
-    position:absolute;
-    bottom:0;
-    width:100%;
-    height:50%;
-    background:
-    linear-gradient(to top,
-    rgba(255,255,255,0.08),
-    transparent);
-    opacity:.12;
-}
-
-/* Main screen */
-
-.screen{
-    height:100vh;
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-    align-items:center;
-    text-align:center;
-    animation:fadeIn 2s ease;
-}
-
-/* Title */
-
-.title{
-    font-size:72px;
-    font-weight:700;
-    letter-spacing:4px;
-    color:#D4AF37;
-    text-shadow:0 0 20px rgba(212,175,55,.4);
-}
-
-/* Subtitle */
-
-.subtitle{
-    margin-top:20px;
-    font-size:20px;
-    color:#D8C3A5;
-    letter-spacing:2px;
-}
-
-/* Button */
-
-.start-btn{
-    margin-top:60px;
-    padding:18px 45px;
-    border:none;
-    border-radius:999px;
-    background:#D4AF37;
-    color:#111111;
-    font-size:18px;
-    font-weight:bold;
-    cursor:pointer;
-    transition:.3s;
-}
-
-.start-btn:hover{
-    transform:scale(1.08);
-    box-shadow:0 0 25px rgba(212,175,55,.5);
-}
-
-/* Press key */
-
-.press-key{
-    position:absolute;
-    bottom:60px;
-    font-size:16px;
-    color:#D8C3A5;
-    animation:pulse 2s infinite;
-}
-
-/* Animations */
-
-@keyframes pulse{
-    50%{
-        opacity:.35;
-    }
-}
-
-@keyframes fadeIn{
-    from{
-        opacity:0;
-        transform:translateY(20px);
-    }
-
-    to{
-        opacity:1;
-        transform:translateY(0);
-    }
-}
-
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cinematic Platformer - Full Game</title>
+    <style>
+        body {
+            margin: 0;
+            background: #0f0f15;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        canvas {
+            border: 2px solid #444;
+            background: #181824;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+        }
+        .controls {
+            margin-top: 12px;
+            color: #aaa;
+            font-size: 14px;
+        }
+    </style>
 </head>
-
 <body>
 
-<div class="background"></div>
-<div class="castle"></div>
-
-<div class="screen">
-
-    <div class="title">
-        THE LOST KINGDOM
+    <h2>Cinematic Platformer</h2>
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+    <div class="controls">
+        <b>A / D</b> to Move | <b>W / Space</b> to Jump & Climb | <b>S</b> to Drop Ledge
     </div>
-
-    <div class="subtitle">
-        Forgotten. Buried. Waiting.
-    </div>
-
-    <button class="start-btn" onclick="startGame()">
-        Start Game
-    </button>
-
-</div>
-
-<div class="press-key">
-    Press Any Key
-</div>
 
 <script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 
-function startGame(){
+const WORLD_WIDTH = 2400;
+const GRAVITY = 0.5;
 
-    window.location.href = "game.html";
+let gameWon = false;
 
+// Camera Tracking System
+const camera = {
+    x: 0,
+    follow(target) {
+        this.x = Math.max(0, Math.min(target.x - canvas.width / 2 + target.width / 2, WORLD_WIDTH - canvas.width));
+    }
+};
+
+// Player Object
+const player = {
+    x: 80,
+    y: 200,
+    width: 24,
+    height: 48,
+    vx: 0,
+    vy: 0,
+    speed: 4,
+    jumpForce: -11,
+    grounded: false,
+    isGrabbingLedge: false,
+    facingRight: true,
+    color: '#e2b04f',
+    
+    reset() {
+        this.x = 80;
+        this.y = 200;
+        this.vx = 0;
+        this.vy = 0;
+        this.isGrabbingLedge = false;
+    }
+};
+
+// Platforms (x, y, width, height)
+const platforms = [
+    { x: 0, y: 360, width: 750, height: 40 },
+    { x: 950, y: 360, width: 1450, height: 40 },
+    { x: 300, y: 270, width: 140, height: 20 },
+    { x: 550, y: 200, width: 120, height: 20 },
+    { x: 1100, y: 260, width: 220, height: 20 },
+    { x: 1450, y: 200, width: 180, height: 20 },
+    { x: 1800, y: 270, width: 200, height: 20 }
+];
+
+// Spikes Hazard
+const hazards = [
+    { x: 750, y: 380, width: 200, height: 20 }
+];
+
+// Enemy Guard
+const enemy = {
+    x: 1150,
+    y: 212,
+    width: 24,
+    height: 48,
+    vx: 1.5,
+    minX: 1100,
+    maxX: 1296,
+    color: '#cc3333'
+};
+
+// Win Goal Door
+const winDoor = {
+    x: 2250,
+    y: 280,
+    width: 40,
+    height: 80,
+    color: '#ffd700'
+};
+
+// Input Handling
+const keys = { left: false, right: false, up: false, down: false };
+
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
+    if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = true;
+    if (e.code === 'KeyW' || e.code === 'Space' || e.code === 'ArrowUp') keys.up = true;
+    if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.down = true;
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
+    if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
+    if (e.code === 'KeyW' || e.code === 'Space' || e.code === 'ArrowUp') keys.up = false;
+    if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.down = false;
+});
+
+// Ledge Detection Logic
+function checkLedgeGrab() {
+    if (player.grounded || player.isGrabbingLedge || player.vy <= 0) return;
+
+    for (let p of platforms) {
+        // Left ledge check
+        if (
+            Math.abs((player.x + player.width) - p.x) < 8 &&
+            Math.abs(player.y - p.y) < 15 &&
+            player.facingRight
+        ) {
+            player.isGrabbingLedge = true;
+            player.x = p.x - player.width;
+            player.y = p.y;
+            player.vx = 0;
+            player.vy = 0;
+            return;
+        }
+
+        // Right ledge check
+        if (
+            Math.abs(player.x - (p.x + p.width)) < 8 &&
+            Math.abs(player.y - p.y) < 15 &&
+            !player.facingRight
+        ) {
+            player.isGrabbingLedge = true;
+            player.x = p.x + p.width;
+            player.y = p.y;
+            player.vx = 0;
+            player.vy = 0;
+            return;
+        }
+    }
 }
 
-document.addEventListener("keydown", startGame);
+// Solid Box Collision System
+function handleCollisions() {
+    player.grounded = false;
 
+    for (let p of platforms) {
+        if (
+            player.x < p.x + p.width &&
+            player.x + player.width > p.x &&
+            player.y < p.y + p.height &&
+            player.y + player.height > p.y
+        ) {
+            const overlapX = (player.x + player.width / 2) < (p.x + p.width / 2)
+                ? (player.x + player.width) - p.x
+                : (p.x + p.width) - player.x;
+
+            const overlapY = (player.y + player.height / 2) < (p.y + p.height / 2)
+                ? (player.y + player.height) - p.y
+                : (p.y + p.height) - player.y;
+
+            if (overlapY < overlapX) {
+                if (player.vy > 0 && player.y + player.height - player.vy <= p.y + 12) {
+                    player.y = p.y - player.height;
+                    player.vy = 0;
+                    player.grounded = true;
+                } else if (player.vy < 0) {
+                    player.y = p.y + p.height;
+                    player.vy = 0;
+                }
+            } else {
+                if (player.vx > 0) player.x = p.x - player.width;
+                else if (player.vx < 0) player.x = p.x + p.width;
+            }
+        }
+    }
+}
+
+// Hazard and Reset Logic
+function checkHazards() {
+    // Spikes
+    for (let h of hazards) {
+        if (
+            player.x < h.x + h.width &&
+            player.x + player.width > h.x &&
+            player.y < h.y + h.height &&
+            player.y + player.height > h.y
+        ) {
+            player.reset();
+        }
+    }
+
+    // Enemy Collision
+    if (
+        player.x < enemy.x + enemy.width &&
+        player.x + player.width > enemy.x &&
+        player.y < enemy.y + enemy.height &&
+        player.y + player.height > enemy.y
+    ) {
+        player.reset();
+    }
+
+    // Falling off map
+    if (player.y > canvas.height + 100) {
+        player.reset();
+    }
+}
+
+// Game Update Loop
+function update() {
+    if (gameWon) return;
+
+    // Handle Ledge Grab state
+    if (player.isGrabbingLedge) {
+        if (keys.up) {
+            player.y -= 25;
+            player.isGrabbingLedge = false;
+        } else if (keys.down) {
+            player.isGrabbingLedge = false;
+        }
+        return;
+    }
+
+    // Player Horizontal Controls
+    if (keys.left) {
+        player.vx = -player.speed;
+        player.facingRight = false;
+    } else if (keys.right) {
+        player.vx = player.speed;
+        player.facingRight = true;
+    } else {
+        player.vx = 0;
+    }
+
+    // Jumping
+    if (keys.up && player.grounded) {
+        player.vy = player.jumpForce;
+        player.grounded = false;
+    }
+
+    // Apply Physics & Movement
+    player.vy += GRAVITY;
+    player.x += player.vx;
+    player.x = Math.max(0, Math.min(player.x, WORLD_WIDTH - player.width));
+
+    player.y += player.vy;
+
+    // Check Logic Systems
+    handleCollisions();
+    checkLedgeGrab();
+    checkHazards();
+
+    // Enemy Patrol Loop
+    enemy.x += enemy.vx;
+    if (enemy.x <= enemy.minX || enemy.x + enemy.width >= enemy.maxX) {
+        enemy.vx *= -1;
+    }
+
+    // Check Victory Trigger
+    if (
+        player.x < winDoor.x + winDoor.width &&
+        player.x + player.width > winDoor.x &&
+        player.y < winDoor.y + winDoor.height &&
+        player.y + player.height > winDoor.y
+    ) {
+        gameWon = true;
+    }
+
+    camera.follow(player);
+}
+
+// Game Render Loop
+function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.translate(-camera.x, 0);
+
+    // Draw Platforms
+    ctx.fillStyle = '#4a4e69';
+    platforms.forEach(p => {
+        ctx.fillRect(p.x, p.y, p.width, p.height);
+        ctx.fillStyle = '#6b705c';
+        ctx.fillRect(p.x, p.y, p.width, 4);
+        ctx.fillStyle = '#4a4e69';
+    });
+
+    // Draw Spikes
+    ctx.fillStyle = '#d90429';
+    hazards.forEach(h => {
+        for (let x = h.x; x < h.x + h.width; x += 10) {
+            ctx.beginPath();
+            ctx.moveTo(x, h.y + h.height);
+            ctx.lineTo(x + 5, h.y);
+            ctx.lineTo(x + 10, h.y + h.height);
+            ctx.fill();
+        }
+    });
+
+    // Draw Enemy Guard
+    ctx.fillStyle = enemy.color;
+    ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+
+    // Draw Goal Door
+    ctx.fillStyle = winDoor.color;
+    ctx.fillRect(winDoor.x, winDoor.y, winDoor.width, winDoor.height);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(winDoor.x, winDoor.y, winDoor.width, winDoor.height);
+
+    // Draw Player
+    ctx.fillStyle = player.color;
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+
+    // Draw Direction Eye
+    ctx.fillStyle = '#000000';
+    const eyeOffset = player.facingRight ? 14 : 4;
+    ctx.fillRect(player.x + eyeOffset, player.y + 8, 4, 4);
+
+    // Draw Victory Screen
+    if (gameWon) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(camera.x, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = '#ffd700';
+        ctx.font = 'bold 36px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('STAGE CLEAR!', camera.x + canvas.width / 2, canvas.height / 2);
+    }
+
+    ctx.restore();
+}
+
+function gameLoop() {
+    update();
+    render();
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
 </script>
-
 </body>
 </html>
